@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    
+    <color name="color_ccec6e55">#ccec6e55</color>
+	<color name="color_aaec6e55">#aaec6e55</color>
+	
+	<color name="color_FD644B">#FD644B</color>
+	<color name="color_55FD644B">#55FD644B</color>
+	<color name="half_apha_white">#AAffffff</color>
+    
+</resources>
