@@ -58,15 +58,19 @@ public class WaveBgTextureView extends TextureView implements TextureView.Surfac
 
 	@Override
 	public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+		Shader mShader = new LinearGradient(0, height - height / 3, 0, height, 
+				new int[] {ContextCompat.getColor(getContext(), R.color.color_FD644B), Color.WHITE}, null, Shader.TileMode.CLAMP); //渐变效果
+		mCanvasPaint.setShader(mShader);
 		mDrawingSurface = new Surface(surface);
 		updateSize(width, height);
+		//创建完TextureView后立即刷新一帧防止黑屏出现
+		Canvas canvas = mDrawingSurface.lockCanvas(mSurfaceRect);
+		canvas.drawRect(mSurfaceRect, mCanvasPaint);
+		mDrawingSurface.unlockCanvasAndPost(canvas);
 		mWaveViewBySinCos1.setWH(width, height);
 		mWaveViewBySinCos1.onSizeChanged(0, 0, 0, 0);
 		mWaveViewBySinCos2.setWH(width, height);
 		mWaveViewBySinCos2.onSizeChanged(0, 0, 0, 0);
-		Shader mShader = new LinearGradient(0, height - height / 3, 0, height, 
-				new int[] {ContextCompat.getColor(getContext(), R.color.color_FD644B), Color.WHITE}, null, Shader.TileMode.MIRROR); //渐变效果
-		mCanvasPaint.setShader(mShader);
 		if (thread == null) {
 			thread = new DrawThread();
 		}
@@ -89,13 +93,7 @@ public class WaveBgTextureView extends TextureView implements TextureView.Surfac
 	
 	@Override
 	public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-		if (thread != null) {
-			thread.flag = false;
-			thread = null;
-		}
-		if(mDrawingSurface != null && mDrawingSurface.isValid()) {
-			mDrawingSurface.release();
-		}
+		stop();
 		return true;
 	}
 
@@ -106,48 +104,44 @@ public class WaveBgTextureView extends TextureView implements TextureView.Surfac
 	
 	@Override
 	protected void onDetachedFromWindow() {
-		if (thread != null) {
-			thread.flag = false;
-			thread = null;
-		}
-		if(mDrawingSurface != null && mDrawingSurface.isValid()) {
-			mDrawingSurface.release();
-		}
+		stop();
 		super.onDetachedFromWindow();
 	}
 	
 	class DrawThread extends Thread {
 		boolean flag = true;// 线程标识
-
+		boolean isPause = false; // 是否暂停 
 		@Override
 		public void run() {
 			super.run();
 			while (flag) {
-				long startTime = System.currentTimeMillis();
-				Canvas canvas = null;
-				try {
-					synchronized (mDrawingSurface) {
-						canvas = mDrawingSurface.lockCanvas(mSurfaceRect);
-						if(canvas != null) {
-							canvas.drawRect(mSurfaceRect, mCanvasPaint);
-							mWaveViewBySinCos1.drawSin(canvas, mDrawingWidth, mDrawingHeight);
-							mWaveViewBySinCos2.drawSin(canvas, mDrawingWidth, mDrawingHeight);
+				if(!isPause) {
+					long startTime = System.currentTimeMillis();
+					Canvas canvas = null;
+					try {
+						synchronized (mDrawingSurface) {
+							canvas = mDrawingSurface.lockCanvas(mSurfaceRect);
+							if(canvas != null) {
+								canvas.drawRect(mSurfaceRect, mCanvasPaint);
+								mWaveViewBySinCos1.drawSin(canvas, mDrawingWidth, mDrawingHeight);
+								mWaveViewBySinCos2.drawSin(canvas, mDrawingWidth, mDrawingHeight);
+							}
 						}
-					}
-					long endTime = System.currentTimeMillis();
-					int diffTime = (int) (endTime - startTime);
-					/** 确保每次更新时间为N�? **/
-					while (diffTime <= TIME_IN_FRAME) {
-						diffTime = (int) (System.currentTimeMillis() - startTime);
-						/** 线程等待 **/
-						Thread.yield();
-					}
-				} catch (Exception e) {
-					e.printStackTrace();
-				} finally {
-					if (canvas != null) {
-						if(mDrawingSurface != null && mDrawingSurface.isValid()) {
-							mDrawingSurface.unlockCanvasAndPost(canvas);
+						long endTime = System.currentTimeMillis();
+						int diffTime = (int) (endTime - startTime);
+						/** 确保每次更新时间为N�? **/
+						while (diffTime <= TIME_IN_FRAME) {
+							diffTime = (int) (System.currentTimeMillis() - startTime);
+							/** 线程等待 **/
+							Thread.yield();
+						}
+					} catch (Exception e) {
+						e.printStackTrace();
+					} finally {
+						if (canvas != null) {
+							if(mDrawingSurface != null && mDrawingSurface.isValid()) {
+								mDrawingSurface.unlockCanvasAndPost(canvas);
+							}
 						}
 					}
 				}
@@ -156,24 +150,21 @@ public class WaveBgTextureView extends TextureView implements TextureView.Surfac
 	}
 
 	public void pause() {
-		thread.flag = false;
+		thread.isPause = true;
 	}
 	
 	public void resume() {
-		thread.flag = true;
+		thread.isPause = false;
 	}
 	
-	public void stop() {
+	private void stop() {
 		if (thread != null) {
 			thread.flag = false;
 			thread = null;
 		}
-	}
-
-	public void start() {
-		if (thread == null) {
-			thread = new DrawThread();
-			thread.start();
+		if(mDrawingSurface != null && mDrawingSurface.isValid()) {
+			mDrawingSurface.release();
+			mDrawingSurface = null;
 		}
 	}
 	
